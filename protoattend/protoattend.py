@@ -1,4 +1,9 @@
 from protoattend.module import ProtoAttendModule
+from typing import Union
+import numpy as np
+import torch
+import torch.utils.data as tud
+import pytorch_lightning as pl
 
 
 class ProtoAttend:
@@ -32,3 +37,8 @@ class ProtoAttend:
         self.lightning_module.train_loader = train_dataloader
         self.lightning_module.val_loader = val_dataloader
         trainer.fit(self.lightning_module)
+
+    def predict(self, X_test):
+        test_loader = self.make_dataloaders(X_test)
+        out = self.lightning_module.infer(test_loader)
+        return out
