@@ -1,11 +1,19 @@
 <component name="ProjectDictionaryState">
   <dictionary name="laksh">
     <words>
+      <w>adabound</w>
       <w>cand</w>
+      <w>dataloader</w>
+      <w>dataloaders</w>
+      <w>dataset</w>
       <w>hparams</w>
+      <w>idxs</w>
       <w>logits</w>
       <w>probs</w>
+      <w>softmax</w>
+      <w>sparsemax</w>
       <w>sqrt</w>
+      <w>tensorboard</w>
     </words>
   </dictionary>
 </component>

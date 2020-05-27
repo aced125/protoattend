@@ -6,7 +6,7 @@ import pytest
 
 from click.testing import CliRunner
 
-from protoattend import protoattend
+from protoattend import module
 from protoattend import cli
 
 
