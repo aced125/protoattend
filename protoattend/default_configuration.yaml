@@ -23,21 +23,21 @@ optimizer_params:
   weight_decay: 0.01
   amsgrad: false
 
-# Scheduler params
-scheduler: ReduceLROnPlateau
-scheduler_params:
-  monitor: val_loss
-  interval: epoch
-  frequency: 1
-  mode: min
-  factor: 0.7
-  patience: 3
-  verbose: true
-  threshold: 0.0001
-  threshold_mode: rel
-  cooldown: 0
-  min_lr: 0
-  eps: 1.0e-08
+## Scheduler params
+#scheduler: ReduceLROnPlateau
+#scheduler_params:
+#  monitor: val_loss
+#  interval: epoch
+#  frequency: 1
+#  mode: min
+#  factor: 0.7
+#  patience: 3
+#  verbose: true
+#  threshold: 0.0001
+#  threshold_mode: rel
+#  cooldown: 0
+#  min_lr: 0
+#  eps: 1.0e-08
 
 # PyTorch-lightning Trainer params
 trainer_params:

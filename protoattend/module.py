@@ -321,17 +321,23 @@ class ProtoAttendModule(pl.LightningModule):
         optimizer_params.pop("lr")
         optimizer = optimizer_class(self.parameters(), self.lr, **optimizer_params)
 
-        scheduler_params = self.hparams_to_init.scheduler_params.__dict__
-        scheduler = {
-            "monitor": scheduler_params.pop("monitor", "val_loss"),
-            "interval": scheduler_params.pop("interval", "epoch"),
-            "frequency": scheduler_params.pop("frequency", 1),
-        }
-        scheduler_class = getattr(
-            torch.optim.lr_scheduler, self.hparams_to_init.scheduler
-        )
-        scheduler.update({"scheduler": scheduler_class(optimizer, **scheduler_params)})
-        return [optimizer], [scheduler]
+        to_return = ([optimizer],)
+
+        if hasattr(self.hparams_to_init, "scheduler"):
+            scheduler_params = self.hparams_to_init.scheduler_params.__dict__
+            scheduler = {
+                "monitor": scheduler_params.pop("monitor", "val_loss"),
+                "interval": scheduler_params.pop("interval", "epoch"),
+                "frequency": scheduler_params.pop("frequency", 1),
+            }
+            scheduler_class = getattr(
+                torch.optim.lr_scheduler, self.hparams_to_init.scheduler
+            )
+            scheduler.update(
+                {"scheduler": scheduler_class(optimizer, **scheduler_params)}
+            )
+            to_return += [scheduler]
+        return to_return
 
     @staticmethod
     def collate(output: List[LOG_TYPE]) -> LOG_TYPE:
