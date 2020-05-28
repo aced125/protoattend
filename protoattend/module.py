@@ -30,7 +30,7 @@ class ProtoAttendModule(pl.LightningModule):
         self.val_loader = None
 
         self.hparams_to_init = copy.deepcopy(hparams)  # Used to initialize module
-        self.hparams = hparams.__dict__
+        self.hparams = hparams
 
         self.lr = self.hparams_to_init.optimizer_params.lr
 
@@ -319,7 +319,7 @@ class ProtoAttendModule(pl.LightningModule):
             )
         optimizer_params = copy.deepcopy(self.hparams_to_init.optimizer_params.__dict__)
         optimizer_params.pop("lr")
-        optimizer = optimizer_class(self.parameters(), self.lr, **optimizer_params)
+        optimizer = optimizer_class(self.parameters(), self.hparams.lr, **optimizer_params)
 
         to_return = [optimizer]
 
