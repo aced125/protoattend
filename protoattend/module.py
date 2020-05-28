@@ -30,8 +30,9 @@ class ProtoAttendModule(pl.LightningModule):
         self.val_loader = None
 
         self.hparams_to_init = copy.deepcopy(hparams)  # Used to initialize module
-        self.hparams = hparams
 
+        self.hparams = hparams
+        self.hparams.lr = hparams.optimizer_params.lr
         self.lr = self.hparams_to_init.optimizer_params.lr
 
         self.d_encoder = self.hparams_to_init.d_encoder
