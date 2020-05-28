@@ -18,11 +18,6 @@ requirements = [
     'pytorch-lightning',
     'sparsemax',
     'numpy',
-    # 'torchvision',
-    # 'pillow',
-    # 'pandas',
-    # 'matplotlib',
-    # 'seaborn'
 ]
 
 setup_requirements = ['pytest-runner', ]
