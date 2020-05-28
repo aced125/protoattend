@@ -1,5 +1,6 @@
 import yaml
 import os.path as osp
+from pathlib import Path
 import torch.nn as nn
 from functools import singledispatch
 from types import SimpleNamespace
@@ -10,9 +11,7 @@ def compute_input_candidate_ratio(input_batch_size, candidate_batch_size):
 
 
 def load_default_config():
-    dir_path = osp.dirname(osp.realpath(__file__))
-    default_config_file = osp.join(dir_path, "default_configuration.yaml")
-    with open(default_config_file, "r") as file:
+    with open(Path(__file__).parents[1] / "default_configuration.yaml", "r") as file:
         return yaml.load(file, Loader=yaml.FullLoader)
 
 
