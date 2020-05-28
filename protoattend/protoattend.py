@@ -12,26 +12,19 @@ logger = logging.getLogger(__name__)
 
 
 class ProtoAttend:
-    def __init__(
-        self,
-        encoder,
-        num_classes,
-        model_output_dim: int = None,
-        hparams: Union[Dict, Namespace] = None,
-    ):
-        if hparams is None:
-            hparams = utils.load_default_config()
-        if not isinstance(hparams, Namespace):
-            hparams = utils.wrap_namespace(hparams)
+    def __init__(self, encoder, num_classes, model_output_dim: int = None, **hparams):
+        self.hparams = utils.load_default_config()
+        self.hparams.update(hparams)
+        if not isinstance(self.hparams, Namespace):
+            self.hparams = utils.wrap_namespace(self.hparams)
 
-        hparams.num_classes = num_classes
+        self.hparams.num_classes = num_classes
 
-        hparams.d_encoder = model_output_dim
+        self.hparams.d_encoder = model_output_dim
         if not model_output_dim:
-            hparams.d_encoder = utils.infer_model_output_dim(encoder)
+            self.hparams.d_encoder = utils.infer_model_output_dim(encoder)
 
-        self.hparams = hparams
-        self.module = ProtoAttendModule(encoder, hparams)
+        self.module = ProtoAttendModule(encoder, self.hparams)
 
     @staticmethod
     def make_dataset(
