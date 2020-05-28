@@ -321,7 +321,7 @@ class ProtoAttendModule(pl.LightningModule):
         optimizer_params.pop("lr")
         optimizer = optimizer_class(self.parameters(), self.lr, **optimizer_params)
 
-        to_return = ([optimizer],)
+        to_return = [optimizer]
 
         if hasattr(self.hparams_to_init, "scheduler"):
             scheduler_params = self.hparams_to_init.scheduler_params.__dict__
@@ -336,7 +336,7 @@ class ProtoAttendModule(pl.LightningModule):
             scheduler.update(
                 {"scheduler": scheduler_class(optimizer, **scheduler_params)}
             )
-            to_return += [scheduler]
+            to_return = ([optimizer], [scheduler])
         return to_return
 
     @staticmethod
