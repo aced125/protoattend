@@ -272,14 +272,12 @@ class ProtoAttendModule(pl.LightningModule):
             # attn: B_input x B_database (e.g 16 x 30_000)
             attn_weights, attn_indices = attention.topk(5, dim=-1)
             output = {
-                "prototype_idxs": attn_indices,
-                "prototype_weights": attn_weights,
-                "confidence": confidence,
-                "predictions": predictions,
+                "prototype_idxs": attn_indices.cpu(),
+                "prototype_weights": attn_weights.cpu(),
+                "confidence": confidence.cpu(),
+                "predictions": predictions.cpu(),
             }
             outputs.append(output)
-            # if idx == 5:
-            #     break
 
         outputs = self.collate(outputs)
 
