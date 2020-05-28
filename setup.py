@@ -15,6 +15,7 @@ requirements = [
     'tqdm',
     'pyyaml>=5.1',
     'torch',
+    'torch_optimizer',
     'pytorch-lightning',
     'sparsemax',
     'numpy',

@@ -2,11 +2,12 @@ import torch
 import torch.nn as nn
 import torch.utils.data as tud
 import pytorch_lightning as pl
+import torch_optimizer
 from sparsemax import Sparsemax
 from tqdm import tqdm
 import math
 import copy
-
+import protoattend.utils as utils
 from typing import Union, List, Dict, Iterable
 import logging
 
@@ -306,7 +307,16 @@ class ProtoAttendModule(pl.LightningModule):
 
     def configure_optimizers(self):
         """Configures optimizers and LR schedulers"""
-        optimizer_class = getattr(torch.optim, self.hparams_to_init.optimizer)
+        optim_name = self.hparams_to_init.optimizer
+        if hasattr(torch.optim, optim_name):
+            optimizer_class = getattr(torch.optim, optim_name)
+        elif hasattr(torch_optimizer, optim_name):
+            optimizer_class = getattr(torch_optimizer, optim_name)
+        else:
+            raise AttributeError(
+                f"Optimizer: {optim_name} is not available. "
+                f"Available optimizers: {utils.get_available_optimizers()}"
+            )
         optimizer_params = copy.deepcopy(self.hparams_to_init.optimizer_params.__dict__)
         optimizer_params.pop("lr")
         optimizer = optimizer_class(self.parameters(), self.lr, **optimizer_params)

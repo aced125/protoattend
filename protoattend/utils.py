@@ -2,8 +2,22 @@ import yaml
 import os.path as osp
 from pathlib import Path
 import torch.nn as nn
+import torch
+import torch_optimizer
 from functools import singledispatch
 from types import SimpleNamespace
+
+
+def is_capitalized(string: str) -> bool:
+    return string[0].isupper()
+
+
+def get_available_optimizers():
+    native_optims = [optim for optim in dir(torch.optim) if is_capitalized(optim)]
+    extra_optims = [optim for optim in torch_optimizer.__all__ if is_capitalized(optim)]
+    all_optims = native_optims + extra_optims
+    all_optims.sort()
+    return all_optims
 
 
 def compute_input_candidate_ratio(input_batch_size, candidate_batch_size):
