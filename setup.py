@@ -57,7 +57,7 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/aced125/protoattend',
-    version='0.1.12',
+    version='0.1.13',
     zip_safe=False,
 )
 # fmt: on
