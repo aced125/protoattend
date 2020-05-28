@@ -3,7 +3,7 @@ include CONTRIBUTING.rst
 include HISTORY.rst
 include LICENSE
 include README.rst
-include default_configuration.yaml
+include protoattend/default_configuration.yaml
 
 recursive-include tests *
 recursive-exclude * __pycache__

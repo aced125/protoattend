@@ -15,14 +15,14 @@ requirements = [
     'tqdm',
     'pyyaml',
     'torch',
-    'torchvision',
-    'pillow',
     'pytorch-lightning',
     'sparsemax',
     'numpy',
-    'pandas',
-    'matplotlib',
-    'seaborn'
+    # 'torchvision',
+    # 'pillow',
+    # 'pandas',
+    # 'matplotlib',
+    # 'seaborn'
 ]
 
 setup_requirements = ['pytest-runner', ]

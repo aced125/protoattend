@@ -11,7 +11,7 @@ def compute_input_candidate_ratio(input_batch_size, candidate_batch_size):
 
 
 def load_default_config():
-    with open(Path(__file__).parents[1] / "default_configuration.yaml", "r") as file:
+    with open(Path(__file__).parent / "default_configuration.yaml", "r") as file:
         return yaml.load(file, Loader=yaml.FullLoader)
 
 
