@@ -13,7 +13,7 @@ with open('HISTORY.rst') as history_file:
 requirements = [
     'Click>=7.0',
     'tqdm',
-    'pyyaml',
+    'pyyaml>=5.1',
     'torch',
     'pytorch-lightning',
     'sparsemax',
