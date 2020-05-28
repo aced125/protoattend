@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
+import torch.utils.data as tud
 import pytorch_lightning as pl
 from sparsemax import Sparsemax
 from tqdm import tqdm
 import math
+import copy
 
 from typing import Union, List, Dict, Iterable
 import logging
@@ -26,29 +28,29 @@ class ProtoAttendModule(pl.LightningModule):
         self.train_loader = None
         self.val_loader = None
 
-        self.model_config = hparams["model_config"]
-        self.hparams = hparams
+        self.hparams_to_init = copy.deepcopy(hparams)  # Used to initialize module
+        self.hparams = hparams.__dict__
 
-        self.lr = self.hparams.lr
+        self.lr = self.hparams_to_init.optimizer_params.lr
 
-        self.d_model = self.model_config.d_model
-        self.d_att = self.model_config.d_att
-        self.sqrt_d_att = math.sqrt(self.d_att)
-        self.d_val = self.model_config.d_val
-        self.d_intermediate = self.model_config.d_intermediate
+        self.d_encoder = self.hparams_to_init.d_encoder
+        self.d_attention = self.hparams_to_init.d_attention
+        self.sqrt_d_att = math.sqrt(self.d_attention)
+        self.d_val = self.hparams_to_init.d_val
+        self.d_intermediate = self.hparams_to_init.d_intermediate
 
         self.encoder = encoder
         self.encoder_and_ffn = nn.Sequential(
             encoder,
-            nn.Linear(self.d_model, self.d_intermediate),
+            nn.Linear(self.d_encoder, self.d_intermediate),
             nn.ReLU(inplace=True),
             nn.LayerNorm(self.d_intermediate),
         )
         self.Q_inp = nn.Sequential(
-            nn.Linear(self.d_intermediate, self.d_att), nn.ReLU(inplace=True)
+            nn.Linear(self.d_intermediate, self.d_attention), nn.ReLU(inplace=True)
         )
         self.K_cand = nn.Sequential(
-            nn.Linear(self.d_intermediate, self.d_att), nn.ReLU(inplace=True)
+            nn.Linear(self.d_intermediate, self.d_attention), nn.ReLU(inplace=True)
         )
         self.V = nn.Sequential(
             nn.Linear(self.d_intermediate, self.d_val),
@@ -59,7 +61,7 @@ class ProtoAttendModule(pl.LightningModule):
         self.sparsemax = Sparsemax(-1)
         self.softmax = nn.Softmax(-1)
 
-        self.classifier = nn.Linear(self.d_val, self.model_config.num_classes)
+        self.classifier = nn.Linear(self.d_val, self.hparams_to_init.num_classes)
 
     def attention(self, Q, K, sparse=True):
         """Computes attention logits, then pass through sparsemax or softmax"""
@@ -69,12 +71,14 @@ class ProtoAttendModule(pl.LightningModule):
         return self.softmax(attention_logits)
 
     def attention_sparsity_loss(self, attention):
-        eps = self.hparams.sparsity_epsilon
-        entropy = attention * (attention + eps).log().sum(-1).mean()
+        eps = self.hparams_to_init.sparsity_epsilon
+        entropy = attention * (attention + eps).log()
+        entropy = entropy.sum(-1).mean()
         return -entropy
 
     @staticmethod
     def confidence_loss(attention, input_y, candidate_y, reduce=True):
+        """Maximise attention weights where input == candidate labels"""
         indicator = input_y.unsqueeze(-1).eq(candidate_y.unsqueeze(0))  # B_img x B_cand
         confidence = (attention * indicator).sum(-1)
         if reduce:
@@ -85,10 +89,6 @@ class ProtoAttendModule(pl.LightningModule):
         if isinstance(alpha, list):
             return [self.classifier(a * p + (1 - a) * q) for a in alpha]
         return self.classifier(alpha * p + (1 - alpha) * q)
-
-    def to_fp16(self, tensors: Union[Iterable, torch.Tensor]):
-        if not isinstance(tensors, torch.Tensor):
-            return [self.to_fp16(x) for x in tensors]
 
     def forward(self, batch):
         (
@@ -143,8 +143,8 @@ class ProtoAttendModule(pl.LightningModule):
                 self_loss
                 + intermediate_loss
                 + prototype_loss
-                + self.hparams.sparsity_weight * sparsity_loss
-                + self.hparams.confidence_weight * confidence_loss
+                + self.hparams_to_init.sparsity_weight * sparsity_loss
+                + self.hparams_to_init.confidence_weight * confidence_loss
             )
 
             output.update(
@@ -175,11 +175,12 @@ class ProtoAttendModule(pl.LightningModule):
         correct = (predictions == output.pop("labels")).float().mean()
 
         # Replace all keys in output dictionary; eg "loss" -> "val_loss"
+        renamed_keys_output = {}
         for old_key, value in output.items():
             new_key = "val_" + old_key
-            output[new_key] = output.pop(old_key)
-        output.update({"correct": correct})
-        return output
+            renamed_keys_output[new_key] = output[old_key]
+        renamed_keys_output.update({"correct": correct})
+        return renamed_keys_output
 
     def validation_epoch_end(self, output: List[LOG_TYPE]):
         output: Dict[str, Union[torch.Tensor, LOG_TYPE]] = self.collate(output)
@@ -196,17 +197,27 @@ class ProtoAttendModule(pl.LightningModule):
     def val_dataloader(self):
         return self.val_loader
 
+    @staticmethod
+    def get_dataloader_without_shuffle(loader: tud.DataLoader):
+        train_dataloader_kwargs = {
+            k: v for k, v in loader.__dict__.items() if not k.startswith("_")
+        }
+        train_dataloader_kwargs.pop("batch_sampler")
+        train_dataloader_kwargs.pop("sampler")
+        train_dataloader_kwargs.update({"shuffle": False})
+        return tud.DataLoader(**train_dataloader_kwargs)
+
     def cache_database_computations(self):
         """Computes keys, values and stores labels for the database."""
+        logger.info(f"Caching database key and values")
 
         # Initialize temporary state - disable dataloader shuffle, gradients, dropout, batchNorm
-        original_shuffle_bool = getattr(self.train_loader, "shuffle")
-        setattr(self.train_loader, "shuffle", False)
+        train_loader = self.get_dataloader_without_shuffle(self.train_loader)
         torch.set_grad_enabled(False)
         self.eval()
 
         outputs = []
-        for batch in tqdm(self.train_loader):
+        for idx, batch in tqdm(enumerate(train_loader)):
             x, y = batch
             x = x.to(next(self.encoder.parameters()))
             encoding = self.encoder_and_ffn(x)
@@ -214,6 +225,8 @@ class ProtoAttendModule(pl.LightningModule):
             encoded_value = self.V(encoding)
             output = {"keys": encoded_key, "values": encoded_value, "labels": y}
             outputs.append(output)
+            if idx == 5:
+                break
 
         outputs = self.collate(outputs)
         self.database_keys = outputs["keys"]
@@ -225,7 +238,8 @@ class ProtoAttendModule(pl.LightningModule):
         # Restore original state
         self.train()
         torch.set_grad_enabled(True)
-        setattr(self.train_loader, "shuffle", original_shuffle_bool)
+        # TODO: sort this out
+        # setattr(self.train_loader, "shuffle", original_shuffle_bool)
 
     def infer(self, loader):
         """Runs inference on a tud.DataLoader."""
@@ -237,10 +251,8 @@ class ProtoAttendModule(pl.LightningModule):
         torch.set_grad_enabled(False)
         self.eval()
 
-        prototype_idxs = []
-        prototype_weights = []
         outputs = []
-        for batch in tqdm(loader):
+        for idx, batch in tqdm(enumerate(loader)):
             x, *_ = batch
             x = x.to(next(self.encoder.parameters()))
 
@@ -256,7 +268,7 @@ class ProtoAttendModule(pl.LightningModule):
             )
             predictions = intermediate_logits.argmax(-1)
             confidence = -self.confidence_loss(
-                attention, predictions, self.database_values
+                attention, predictions, self.database_labels, reduce=False
             )
             # attn: B_input x B_database (e.g 16 x 30_000)
             attn_weights, attn_indices = attention.topk(5, dim=-1)
@@ -264,9 +276,11 @@ class ProtoAttendModule(pl.LightningModule):
                 "prototype_idxs": attn_indices,
                 "prototype_weights": attn_weights,
                 "confidence": confidence,
-                "prediction": predictions,
+                "predictions": predictions,
             }
             outputs.append(output)
+            if idx == 5:
+                break
 
         outputs = self.collate(outputs)
 
@@ -281,7 +295,7 @@ class ProtoAttendModule(pl.LightningModule):
         x, y = batch
 
         batch_size = x.size(0)
-        cutoff = math.ceil(batch_size * self.hparams.input_ratio)
+        cutoff = math.ceil(batch_size * self.hparams_to_init.input_ratio)
         rand = torch.randperm(batch_size, device=x.device)
         input_idxs = rand[:cutoff]
         cand_idxs = rand[cutoff:]
@@ -295,11 +309,22 @@ class ProtoAttendModule(pl.LightningModule):
 
     def configure_optimizers(self):
         """Configures optimizers and LR schedulers"""
-        optimizer_class = getattr(torch.optim, self.hparams.optimizer)
-        optimizer = optimizer_class(self.parameters(), **self.hparams.optimizer_params)
-        scheduler_class = getattr(torch.optim, self.hparams.scheduler)
-        scheduler = scheduler_class(optimizer, **self.hparams.scheduler_params)
-        return optimizer, scheduler
+        optimizer_class = getattr(torch.optim, self.hparams_to_init.optimizer)
+        optimizer_params = copy.deepcopy(self.hparams_to_init.optimizer_params.__dict__)
+        optimizer_params.pop("lr")
+        optimizer = optimizer_class(self.parameters(), self.lr, **optimizer_params)
+
+        scheduler_params = self.hparams_to_init.scheduler_params.__dict__
+        scheduler = {
+            "monitor": scheduler_params.pop("monitor", "val_loss"),
+            "interval": scheduler_params.pop("interval", "epoch"),
+            "frequency": scheduler_params.pop("frequency", 1),
+        }
+        scheduler_class = getattr(
+            torch.optim.lr_scheduler, self.hparams_to_init.scheduler
+        )
+        scheduler.update({"scheduler": scheduler_class(optimizer, **scheduler_params)})
+        return [optimizer], [scheduler]
 
     @staticmethod
     def collate(output: List[LOG_TYPE]) -> LOG_TYPE:
@@ -310,7 +335,7 @@ class ProtoAttendModule(pl.LightningModule):
             tensor_dim = example[key].dim()
             if tensor_dim == 0:
                 collated_output[key] = torch.stack([x[key] for x in output]).mean()
-            elif tensor_dim == 1:
+            elif tensor_dim == 1 or tensor_dim == 2:
                 collated_output[key] = torch.cat([x[key] for x in output])
             else:
                 raise ValueError(f"Unexpected tensor dimension: {tensor_dim}")
