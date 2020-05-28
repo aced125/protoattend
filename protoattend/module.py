@@ -220,13 +220,12 @@ class ProtoAttendModule(pl.LightningModule):
         for idx, batch in tqdm(enumerate(train_loader)):
             x, y = batch
             x = x.to(next(self.encoder.parameters()))
+            y = y.to(next(self.encoder.parameters()))
             encoding = self.encoder_and_ffn(x)
             encoded_key = self.K_cand(encoding)
             encoded_value = self.V(encoding)
             output = {"keys": encoded_key, "values": encoded_value, "labels": y}
             outputs.append(output)
-            if idx == 5:
-                break
 
         outputs = self.collate(outputs)
         self.database_keys = outputs["keys"]
@@ -279,8 +278,8 @@ class ProtoAttendModule(pl.LightningModule):
                 "predictions": predictions,
             }
             outputs.append(output)
-            if idx == 5:
-                break
+            # if idx == 5:
+            #     break
 
         outputs = self.collate(outputs)
 
