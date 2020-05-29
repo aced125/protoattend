@@ -2,7 +2,7 @@
 # fmt: off
 __author__ = """Laksh Aithani"""
 __email__ = 'lakshaithanii@gmail.com'
-__version__ = '0.1.14'
+__version__ = '0.1.15'
 # fmt: on
 
 
